@@ -1,0 +1,64 @@
+# Old maintainers:
+# Maintainer: Jose Riha <jose1711 gmail com>
+# Contributor: Patrick Jackson <PatrickSJackson gmail com>
+# Contributor: Christoph Vigano <mail@cvigano.de>
+
+pkgname=st
+pkgver=0.8.2
+pkgrel=1
+pkgdesc='A simple virtual terminal emulator for X.'
+arch=('i686' 'x86_64' 'armv7h')
+license=('MIT')
+depends=('libxft' 'libxext' 'adobe-source-code-pro-fonts' 'git')
+makedepends=('ncurses')
+url="https://st.suckless.org"
+source=("git://git.suckless.org/st"
+        "config.h"
+        "${_patches[@]}")
+sha256sums=('SKIP'
+            '28f7d7832a17560fb6a522a918083c8b9fc29d4513c33779b75723895217f58c')
+provides=("${pkgname}")
+conflicts=("${pkgname}")
+
+#pkgver() {
+#	cd "${_pkgname}"
+#	printf "%s.r%s.%s" "$(awk '/^VERSION =/ {print $3}' config.mk)" \
+#		"$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+#}
+_patches=(
+    "https://st.suckless.org/patches/scrollback/st-scrollback-20190331-21367a0.diff"
+)
+
+prepare() {
+  # user is supposed to maintain config.h him/herself
+  mv st $srcdir/$pkgname-$pkgver
+  cd $srcdir/$pkgname-$pkgver
+  # skip terminfo which conflicts with nsurses
+  #sed -i '/\ttic -sx st.info/d' Makefile
+
+  # NB -> Config before patches
+  cp $srcdir/config.h $srcdir/$pkgname-$pkgver/config.def.h
+
+  for patch in "${_patches[@]}"; do
+    if ! [ -f $patch ]; then
+      echo "Downloading patches..."
+      wget $patch
+    fi
+    echo "Applying patch $(basename $patch)..."
+    patch -Np1 -i "$srcdir/$pkgname-$pkgver/$(basename $patch)"
+  done
+}
+
+build() {
+  cd $srcdir/$pkgname-$pkgver
+  make X11INC=/usr/include/X11 X11LIB=/usr/lib/X11
+}
+
+package() {
+  cd $srcdir/$pkgname-$pkgver
+  make PREFIX=/usr DESTDIR="$pkgdir" TERMINFO="$pkgdir/usr/share/terminfo" install
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README "$pkgdir/usr/share/doc/$pkgname/README"
+  # remove to avoid conflict with ncurses
+  #rm "${pkgdir}/usr/share/terminfo/s/st" "${pkgdir}/usr/share/terminfo/s/st-256color" 
+}
